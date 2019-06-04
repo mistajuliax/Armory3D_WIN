@@ -1,0 +1,3 @@
+[submodule "armory"]
+	path = armsdk
+	url = https://github.com/armory3d/armsdk
