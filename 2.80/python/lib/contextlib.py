@@ -143,21 +143,6 @@ class _GeneratorContextManager(_GeneratorContextManagerBase,
                 if type is StopIteration and exc.__cause__ is value:
                     return False
                 raise
-            except:
-                # only re-raise if it's *not* the exception that was
-                # passed to throw(), because __exit__() must not raise
-                # an exception unless __exit__() itself failed.  But throw()
-                # has to raise the exception to signal propagation, so this
-                # fixes the impedance mismatch between the throw() protocol
-                # and the __exit__() protocol.
-                #
-                # This cannot use 'except BaseException as exc' (as in the
-                # async implementation) to maintain compatibility with
-                # Python 2, where old-style class exceptions are not caught
-                # by 'except BaseException'.
-                if sys.exc_info()[1] is value:
-                    return False
-                raise
             raise RuntimeError("generator didn't stop after throw()")
 
 
@@ -198,9 +183,11 @@ class _AsyncGeneratorContextManager(_GeneratorContextManagerBase,
                 # have this behavior). But do this only if the exception wrapped
                 # by the RuntimeError is actully Stop(Async)Iteration (see
                 # issue29692).
-                if isinstance(value, (StopIteration, StopAsyncIteration)):
-                    if exc.__cause__ is value:
-                        return False
+                if (
+                    isinstance(value, (StopIteration, StopAsyncIteration))
+                    and exc.__cause__ is value
+                ):
+                    return False
                 raise
             except BaseException as exc:
                 if exc is not value:

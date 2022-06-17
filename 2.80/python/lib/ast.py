@@ -52,14 +52,11 @@ def literal_eval(node_or_string):
                 return node.value
         elif isinstance(node, Num):
             return node.n
-        raise ValueError('malformed node or string: ' + repr(node))
+        raise ValueError(f'malformed node or string: {repr(node)}')
     def _convert_signed_num(node):
         if isinstance(node, UnaryOp) and isinstance(node.op, (UAdd, USub)):
             operand = _convert_num(node.operand)
-            if isinstance(node.op, UAdd):
-                return + operand
-            else:
-                return - operand
+            return + operand if isinstance(node.op, UAdd) else - operand
         return _convert_num(node)
     def _convert(node):
         if isinstance(node, Constant):
@@ -83,10 +80,7 @@ def literal_eval(node_or_string):
             left = _convert_signed_num(node.left)
             right = _convert_num(node.right)
             if isinstance(left, (int, float)) and isinstance(right, complex):
-                if isinstance(node.op, Add):
-                    return left + right
-                else:
-                    return left - right
+                return left + right if isinstance(node.op, Add) else left - right
         return _convert_signed_num(node)
     return _convert(node_or_string)
 
@@ -110,11 +104,10 @@ def dump(node, annotate_fields=True, include_attributes=False):
             ))
             if include_attributes and node._attributes:
                 rv += fields and ', ' or ' '
-                rv += ', '.join('%s=%s' % (a, _format(getattr(node, a)))
-                                for a in node._attributes)
-            return rv + ')'
+                rv += ', '.join(f'{a}={_format(getattr(node, a))}' for a in node._attributes)
+            return f'{rv})'
         elif isinstance(node, list):
-            return '[%s]' % ', '.join(_format(x) for x in node)
+            return f"[{', '.join((_format(x) for x in node))}]"
         return repr(node)
     if not isinstance(node, AST):
         raise TypeError('expected AST, got %r' % node.__class__.__name__)
@@ -257,7 +250,7 @@ class NodeVisitor(object):
 
     def visit(self, node):
         """Visit a node."""
-        method = 'visit_' + node.__class__.__name__
+        method = f'visit_{node.__class__.__name__}'
         visitor = getattr(self, method, self.generic_visit)
         return visitor(node)
 

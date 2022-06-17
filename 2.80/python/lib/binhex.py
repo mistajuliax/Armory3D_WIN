@@ -186,10 +186,7 @@ class BinHex:
     def _writecrc(self):
         # XXXX Should this be here??
         # self.crc = binascii.crc_hqx('\0\0', self.crc)
-        if self.crc < 0:
-            fmt = '>h'
-        else:
-            fmt = '>H'
+        fmt = '>h' if self.crc < 0 else '>H'
         self.ofp.write(struct.pack(fmt, self.crc))
         self.crc = 0
 
@@ -330,15 +327,13 @@ class _Rledecoderengine:
         #
         mark = len(self.pre_buffer)
         if self.pre_buffer[-3:] == RUNCHAR + b'\0' + RUNCHAR:
-            mark = mark - 3
+            mark -= 3
         elif self.pre_buffer[-1:] == RUNCHAR:
-            mark = mark - 2
+            mark -= 2
         elif self.pre_buffer[-2:] == RUNCHAR + b'\0':
-            mark = mark - 2
-        elif self.pre_buffer[-2:-1] == RUNCHAR:
-            pass # Decode all
-        else:
-            mark = mark - 1
+            mark -= 2
+        elif self.pre_buffer[-2:-1] != RUNCHAR:
+            mark -= 1
 
         self.post_buffer = self.post_buffer + \
             binascii.rledecode_hqx(self.pre_buffer[:mark])
@@ -415,7 +410,7 @@ class HexBin:
             n = self.dlen
         rv = b''
         while len(rv) < n:
-            rv = rv + self._read(n-len(rv))
+            rv += self._read(n-len(rv))
         self.dlen = self.dlen - n
         return rv
 
@@ -466,8 +461,7 @@ def hexbin(inp, out):
             ofp.write(d)
     ifp.close_data()
 
-    d = ifp.read_rsrc(128000)
-    if d:
+    if d := ifp.read_rsrc(128000):
         ofp = openrsrc(out, 'wb')
         ofp.write(d)
         while True:
