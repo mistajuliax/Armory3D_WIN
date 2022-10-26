@@ -30,8 +30,8 @@ except ImportError:
 def md5sum(data):
     return md5(data).hexdigest()
 
-TEMPDIR = os.path.abspath(support.TESTFN) + "-tardir"
-tarextdir = TEMPDIR + '-extract-test'
+TEMPDIR = f"{os.path.abspath(support.TESTFN)}-tardir"
+tarextdir = f'{TEMPDIR}-extract-test'
 tarname = support.findfile("testtar.tar")
 gzipname = os.path.join(TEMPDIR, "testtar.tar.gz")
 bz2name = os.path.join(TEMPDIR, "testtar.tar.bz2")
@@ -383,9 +383,7 @@ class CommonReadTest(ReadTest):
 
             with tarfile.open(tmpname) as tar:
                 with self.assertRaisesRegex(tarfile.ReadError, "unexpected end of data"):
-                    for t in tar:
-                        pass
-
+                    pass
             with tarfile.open(tmpname) as tar:
                 t = tar.next()
 
@@ -522,12 +520,13 @@ class MiscReadTestBase(CommonReadTest):
 
     def test_check_members(self):
         for tarinfo in self.tar:
-            self.assertEqual(int(tarinfo.mtime), 0o7606136617,
-                    "wrong mtime for %s" % tarinfo.name)
+            self.assertEqual(
+                int(tarinfo.mtime), 0o7606136617, f"wrong mtime for {tarinfo.name}"
+            )
+
             if not tarinfo.name.startswith("ustar/"):
                 continue
-            self.assertEqual(tarinfo.uname, "tarfile",
-                    "wrong uname for %s" % tarinfo.name)
+            self.assertEqual(tarinfo.uname, "tarfile", f"wrong uname for {tarinfo.name}")
 
     def test_find_members(self):
         self.assertEqual(self.tar.getmembers()[-1].name, "misc/eof",
@@ -604,7 +603,26 @@ class MiscReadTestBase(CommonReadTest):
         with support.temp_dir(DIR), \
              tarfile.open(tarname, encoding="iso8859-1") as tar:
             directories = [t for t in tar if t.isdir()]
-            tar.extractall(DIR, directories)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tar, DIR, directories)
             for tarinfo in directories:
                 path = DIR / tarinfo.name
                 self.assertEqual(os.path.getmtime(path), tarinfo.mtime)
@@ -613,7 +631,7 @@ class MiscReadTestBase(CommonReadTest):
         dirtype = "ustar/dirtype"
         DIR = pathlib.Path(TEMPDIR) / "extractall"
         with support.temp_dir(DIR), \
-             tarfile.open(tarname, encoding="iso8859-1") as tar:
+                 tarfile.open(tarname, encoding="iso8859-1") as tar:
             tarinfo = tar.getmember(dirtype)
             tar.extract(tarinfo, path=DIR)
             extracted = DIR / dirtype
@@ -753,17 +771,17 @@ class DetectReadTest(TarTest, unittest.TestCase):
     def _test_modes(self, testfunc):
         if self.suffix:
             with self.assertRaises(tarfile.ReadError):
-                tarfile.open(tarname, mode="r:" + self.suffix)
+                tarfile.open(tarname, mode=f"r:{self.suffix}")
             with self.assertRaises(tarfile.ReadError):
-                tarfile.open(tarname, mode="r|" + self.suffix)
+                tarfile.open(tarname, mode=f"r|{self.suffix}")
             with self.assertRaises(tarfile.ReadError):
                 tarfile.open(self.tarname, mode="r:")
             with self.assertRaises(tarfile.ReadError):
                 tarfile.open(self.tarname, mode="r|")
         testfunc(self.tarname, "r")
-        testfunc(self.tarname, "r:" + self.suffix)
+        testfunc(self.tarname, f"r:{self.suffix}")
         testfunc(self.tarname, "r:*")
-        testfunc(self.tarname, "r|" + self.suffix)
+        testfunc(self.tarname, f"r|{self.suffix}")
         testfunc(self.tarname, "r|*")
 
     def test_detect_file(self):
@@ -799,8 +817,7 @@ class MemberReadTest(ReadTest, unittest.TestCase):
     def _test_member(self, tarinfo, chksum=None, **kwargs):
         if chksum is not None:
             with self.tar.extractfile(tarinfo) as f:
-                self.assertEqual(md5sum(f.read()), chksum,
-                        "wrong md5sum for %s" % tarinfo.name)
+                self.assertEqual(md5sum(f.read()), chksum, f"wrong md5sum for {tarinfo.name}")
 
         kwargs["mtime"] = 0o7606136617
         kwargs["uid"] = 1000
@@ -810,8 +827,11 @@ class MemberReadTest(ReadTest, unittest.TestCase):
             kwargs["uname"] = "tarfile"
             kwargs["gname"] = "tarfile"
         for k, v in kwargs.items():
-            self.assertEqual(getattr(tarinfo, k), v,
-                    "wrong value in %s field of %s" % (k, tarinfo.name))
+            self.assertEqual(
+                getattr(tarinfo, k),
+                v,
+                f"wrong value in {k} field of {tarinfo.name}",
+            )
 
     def test_find_regtype(self):
         tarinfo = self.tar.getmember("ustar/regtype")
@@ -895,7 +915,7 @@ class LongnameTest:
 
     def test_read_longname(self):
         # Test reading of longname (bug #1471427).
-        longname = self.subdir + "/" + "123/" * 125 + "longname"
+        longname = f"{self.subdir}/" + "123/" * 125 + "longname"
         try:
             tarinfo = self.tar.getmember(longname)
         except KeyError:
@@ -904,8 +924,8 @@ class LongnameTest:
                 "read longname as dirtype")
 
     def test_read_longlink(self):
-        longname = self.subdir + "/" + "123/" * 125 + "longname"
-        longlink = self.subdir + "/" + "123/" * 125 + "longlink"
+        longname = f"{self.subdir}/" + "123/" * 125 + "longname"
+        longlink = f"{self.subdir}/" + "123/" * 125 + "longlink"
         try:
             tarinfo = self.tar.getmember(longlink)
         except KeyError:
@@ -913,7 +933,7 @@ class LongnameTest:
         self.assertEqual(tarinfo.linkname, longname, "linkname wrong")
 
     def test_truncated_longname(self):
-        longname = self.subdir + "/" + "123/" * 125 + "longname"
+        longname = f"{self.subdir}/" + "123/" * 125 + "longname"
         tarinfo = self.tar.getmember(longname)
         offset = tarinfo.offset
         self.tar.fileobj.seek(offset)
@@ -924,7 +944,7 @@ class LongnameTest:
     def test_header_offset(self):
         # Test if the start offset of the TarInfo object includes
         # the preceding extended header.
-        longname = self.subdir + "/" + "123/" * 125 + "longname"
+        longname = f"{self.subdir}/" + "123/" * 125 + "longname"
         offset = self.tar.getmember(longname).offset
         with open(tarname, "rb") as fobj:
             fobj.seek(offset)
@@ -950,8 +970,7 @@ class GNUReadTest(LongnameTest, ReadTest, unittest.TestCase):
         filename = os.path.join(TEMPDIR, name)
         with open(filename, "rb") as fobj:
             data = fobj.read()
-        self.assertEqual(md5sum(data), md5_sparse,
-                "wrong md5sum for %s" % name)
+        self.assertEqual(md5sum(data), md5_sparse, f"wrong md5sum for {name}")
 
         if self._fs_supports_holes():
             s = os.stat(filename)
@@ -971,20 +990,16 @@ class GNUReadTest(LongnameTest, ReadTest, unittest.TestCase):
 
     @staticmethod
     def _fs_supports_holes():
-        # Return True if the platform knows the st_blocks stat attribute and
-        # uses st_blocks units of 512 bytes, and if the filesystem is able to
-        # store holes in files.
-        if sys.platform.startswith("linux"):
-            # Linux evidentially has 512 byte st_blocks units.
-            name = os.path.join(TEMPDIR, "sparse-test")
-            with open(name, "wb") as fobj:
-                fobj.seek(4096)
-                fobj.truncate()
-            s = os.stat(name)
-            support.unlink(name)
-            return s.st_blocks == 0
-        else:
+        if not sys.platform.startswith("linux"):
             return False
+        # Linux evidentially has 512 byte st_blocks units.
+        name = os.path.join(TEMPDIR, "sparse-test")
+        with open(name, "wb") as fobj:
+            fobj.seek(4096)
+            fobj.truncate()
+        s = os.stat(name)
+        support.unlink(name)
+        return s.st_blocks == 0
 
 
 class PaxReadTest(LongnameTest, ReadTest, unittest.TestCase):
@@ -1142,9 +1157,7 @@ class WriteTest(WriteTestBase, unittest.TestCase):
                 with unittest.mock.patch('os.listdir') as mock_listdir:
                     mock_listdir.return_value = ["2", "1"]
                     tar.add(path)
-                paths = []
-                for m in tar.getmembers():
-                    paths.append(os.path.split(m.name)[-1])
+                paths = [os.path.split(m.name)[-1] for m in tar.getmembers()]
                 self.assertEqual(paths, ["directory", "1", "2"]);
             finally:
                 tar.close()
@@ -1174,7 +1187,7 @@ class WriteTest(WriteTestBase, unittest.TestCase):
         try:
             os.link(target, link)
         except PermissionError as e:
-            self.skipTest('os.link(): %s' % e)
+            self.skipTest(f'os.link(): {e}')
         try:
             tar = tarfile.open(tmpname, self.mode)
             try:
@@ -1332,8 +1345,8 @@ class WriteTest(WriteTestBase, unittest.TestCase):
         self._test_pathname(os.path.join("..", "foo", ".", "bar"))
         self._test_pathname(os.path.join("..", "foo", "..", "bar"))
 
-        self._test_pathname("foo" + os.sep + os.sep + "bar")
-        self._test_pathname("foo" + os.sep + os.sep, "foo", dir=True)
+        self._test_pathname(f"foo{os.sep}{os.sep}bar")
+        self._test_pathname(f"foo{os.sep}{os.sep}", "foo", dir=True)
 
     def test_abs_pathnames(self):
         if sys.platform == "win32":
@@ -1639,7 +1652,7 @@ class HardlinkTest(unittest.TestCase):
         try:
             os.link(self.foo, self.bar)
         except PermissionError as e:
-            self.skipTest('os.link(): %s' % e)
+            self.skipTest(f'os.link(): {e}')
 
         self.tar = tarfile.open(tmpname, "w")
         self.tar.add(self.foo)
@@ -1967,7 +1980,7 @@ class AppendTestBase:
                     tar.addfile(t, f)
 
     def test_append_compressed(self):
-        self._create_testtar("w:" + self.suffix)
+        self._create_testtar(f"w:{self.suffix}")
         self.assertRaises(tarfile.ReadError, tarfile.open, tmpname, "a")
 
 class AppendTest(AppendTestBase, unittest.TestCase):
@@ -2331,7 +2344,7 @@ class CommandLineTest(unittest.TestCase):
             if not filetype.open:
                 continue
             try:
-                tar_name = tmpname + '.' + filetype.suffix
+                tar_name = f'{tmpname}.{filetype.suffix}'
                 out = self.tarfilecmd('-c', tar_name, *files)
                 with filetype.taropen(tar_name) as tar:
                     tar.getmembers()
@@ -2504,11 +2517,7 @@ def root_is_uid_gid_0():
         import pwd, grp
     except ImportError:
         return False
-    if pwd.getpwuid(0)[0] != 'root':
-        return False
-    if grp.getgrgid(0)[0] != 'root':
-        return False
-    return True
+    return False if pwd.getpwuid(0)[0] != 'root' else grp.getgrgid(0)[0] == 'root'
 
 
 @unittest.skipUnless(hasattr(os, 'chown'), "missing os.chown")
